@@ -21,7 +21,7 @@ Reports on student communication during COVID
 - File 2 Incoming SMS:  https://ctgraduates.lightning.force.com/lightning/r/Report/00O1M0000077bWiUAI/view
 - File 3 Outgoing SMS:  https://ctgraduates.lightning.force.com/lightning/r/Report/00O1M0000077bWTUAY/view?queryScope=userFolders
 - File 4 Student Roster: https://ctgraduates.lightning.force.com/lightning/r/Report/00O1M0000077bWnUAI/view
-- File 5 Emergency Funds: https://ctgraduates.lightning.force.com/lightning/r/Report/00O1M0000077baaUAA/view
+- File 5 Emergency Funds: https://ctgraduates.lightning.force.com/lightning/r/Report/00O1M0000077cchUAA/view
 - File 6 Workshops Attended: https://ctgraduates.lightning.force.com/lightning/r/Report/00O1M0000077bbYUAQ/view
 - File 7 Case Nates: https://ctgraduates.lightning.force.com/lightning/r/Report/00O1M0000077c3cUAA/view
 
@@ -118,20 +118,22 @@ sf_df_file4 =  sf.get_report(report_id_file4, id_column=file_4_id_column)
 
 
 # File 5 (As needed)
-report_id_file5 = "00O1M0000077baaUAA"
+report_id_file5 = "00O1M0000077cchUAA"
 file_5_id_column = '18 Digit ID' # adjust as needed
 sf_df_file5 =  sf.get_report(report_id_file5)
 
 
-# File 6 (As needed)
+# # File 6 (As needed)
 report_id_file6 = "00O1M0000077bbYUAQ"
 file_6_id_column = 'Workshop Session Attendance: Workshop Session Attendance Name' # adjust as needed
 sf_df_file6 =  sf.get_report(report_id_file6, id_column=file_6_id_column)
 
-#File 7
+# #File 7
 report_id_file7 = "00O1M0000077c3cUAA"
 file_7_id_column = 'Case Note: Case Note ID' # adjust as needed
 sf_df_file7 =  sf.get_report(report_id_file7, id_column=file_7_id_column)
+
+
 
 ```
 
@@ -182,12 +184,12 @@ len(sf_df), len(sf_df_file2),len(sf_df_file3),len(sf_df_file4)
 ```
 
 ```python
-# Only run if ran above cell
-# File 1
+# # Only run if ran above cell
+# # File 1
 sf_df.to_csv(in_file1, index=True)
 
 
-# File 2 and 3 (As needed)
+# # File 2 and 3 (As needed)
 sf_df_file2.to_csv(in_file2, index=False)
 sf_df_file3.to_csv(in_file3, index=False)
 sf_df_file4.to_csv(in_file4, index=False)
@@ -214,13 +216,15 @@ df_file3 = pd.read_csv(in_file3)
 df_file4 = pd.read_csv(in_file4)
 df_file5 = pd.read_csv(in_file5)
 df_file6 = pd.read_csv(in_file6)
-df_file6 = pd.read_csv(in_file6)
 df_file7 = pd.read_csv(in_file7)
 ```
 
 ```python
 df_file5['Scholarship Application: Date Applied'] = pd.to_datetime(df_file5['Scholarship Application: Date Applied'])
-df_file5.rename(columns={'Scholarship Application: Date Applied': "Date"}, inplace=True)
+
+df_file5['Date'] = pd.to_datetime(df_file5['Date'])
+# df_file5.rename(columns={'Scholarship Application: Date Applied': "Date"}, inplace=True)
+# df_file5.rename(columns={'Scholarship Application: Date Applied': "Date"}, inplace=True)
 ```
 
 ```python
@@ -373,10 +377,6 @@ emergency_fund_total = df_file5.groupby('18 Digit ID').sum().reset_index()
 ```
 
 ```python
-emergency_fund_7_days
-```
-
-```python
 df_file4 = df_file4.merge(emergency_fund_total, how='left',
                           on='18 Digit ID')
 ```
@@ -486,6 +486,57 @@ df_file4['attended_at_least_one_workshop'] = (df_file4.workshops_attendend > 0)
 Save a file in the processed directory that is cleaned properly. It will be read in and used later for further analysis.
 
 ```python
+df_file4['student_count'] = 1
+```
+
+```python
+# df_file4.loc[df['Contact Record Type'] == "Student: High School", 'Contact Record Type'] = "High School"
+# df_file4.loc[df['Contact Record Type'] == "Student: Post-Secondary", 'Contact Record Type'] = "Post-Secondary"
+```
+
+```python
+# df_file4 = helpers.shorten_site_names(df_file4)
+df_file5 = helpers.shorten_site_names(df_file5)
+
+```
+
+```python
 # Save File 1 Data Frame (Or master df)
 df_file4.to_pickle(summary_file)
+```
+
+```python
+# df_file4 = df_file4.applymap(lambda x: 1 if x == True else x)
+# df_file4 = df_file4.applymap(lambda x: 0 if x == False else x)
+```
+
+```python
+# df_file4.to_csv('student_comms.csv',index=False)
+```
+
+```python
+google_sheet = Spread('1tEzcIDba-dF0M4uMHUt2fwOAtO91U8q6TUFPBp9TSbY')
+
+
+# google_sheet.df_to_sheet(df_file4, index=False, sheet='Sheet1', start='A1', replace=True)
+ 
+```
+
+```python
+google_sheet.df_to_sheet(df_file5, index=True, sheet='Emergency Fund', start='A1', replace=True)
+
+```
+
+```python
+update_date = datetime.now().date().strftime("%m/%d/%y")
+
+```
+
+```python
+google_sheet.update_cells(start='A1',end="A2", sheet="Updated", vals=[
+                          'Updated:', update_date])
+```
+
+```python
+
 ```
