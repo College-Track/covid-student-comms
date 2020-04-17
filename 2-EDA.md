@@ -116,6 +116,12 @@ attended_workshop_table_hs = create_table_for_report(
 ```
 
 ```python
+# merge_columns = ['Site', 'record_type', 'time_period']
+# all_time = been_contacted_table.merge(been_contacted_no_text, on=merge_columns).merge(
+#     reciprocal_communication_table, on=merge_columns).merge(attended_workshop_table, on =merge_columns, how='outer')
+```
+
+```python
 # 7 Days 
 
 been_contacted_table_7_days_hs, been_contacted_table_7_days_college = create_table_for_report(
@@ -129,7 +135,15 @@ reciprocal_communication_table_7_days_hs, reciprocal_communication_table_7_days_
 
 attended_workshop_table_7_days_hs = create_table_for_report(
     df, 'attended_at_least_one_workshop_7_days', "workshops_attendend_7_days", include_ps=False, workshop=True)
+```
 
+```python
+# # seven_days = been_contacted_table_7_days.merge(been_contacted_no_text_table_7_days, on=merge_columns).merge(
+#     reciprocal_communication_table_7_day, on=merge_columns).merge(attended_workshop_table_7_days, on=merge_columns, how='outer')
+```
+
+```python
+# table = seven_days.append(all_time)
 ```
 
 ```python
@@ -146,29 +160,45 @@ reciprocal_communication_table_30_days_hs, reciprocal_communication_table_30_day
 
 attended_workshop_table_30_days_hs = create_table_for_report(
     df, 'attended_at_least_one_workshop_30_days', "workshops_attendend_30_days", include_ps=False,workshop=True)
+```
+
+```python
+seven_day_contacts = reciprocal_communication_table_hs.append(reciprocal_communication_table_college)
+```
+
+```python
+# # 30 Days
+
+# been_contacted_table_30_days_hs, been_contacted_table_30_days_college = create_table_for_report(
+#     df, "been_contacted_30_days", 'total_contacts_30_days', 30)
+
+# been_contacted_no_text_table_30_days_hs, been_contacted_no_text_table_30_days_college = create_table_for_report(
+#     df, 'been_contacted_minis_text_30_days', "activity_count_30_day", 30)
+
+# reciprocal_communication_table_30_days_hs, reciprocal_communication_table_30_days_college = create_table_for_report(
+#     df, 'reciprocal_communication_30_days', "total_reciprocal_communication_30_days", 30)
+
+# attended_workshop_table_30_days_hs = create_table_for_report(
+#     df, 'attended_at_least_one_workshop_30_days', "workshops_attendend_30_days", 30, include_ps=False,workshop=True)
 
 ```
 
 ```python
-emergency_funds = df.pivot_table(index='Site', values=[
-    'Scholarship Application: CT Scholarship Distribution (current AY)',
-    'Scholarship Application: Total Amount Awarded'], aggfunc='sum', margins=True)
+# been_contacted_table_30_days_college.merge(been_contacted_table_30_days_hs, on=['Site', 'record_type', 'time_period'], how='outer')
 ```
 
 ```python
-
+emergency_funds = df.pivot_table(index='Site', values=['Amount'], aggfunc='sum', margins=True)
 ```
 
 ```python
 emergency_funds_30_days = df.pivot_table(index='Site', values=[
-    'Scholarship Application: CT Scholarship Distribution (current AY)_30_days',
-    'Scholarship Application: Total Amount Awarded_30_days'], aggfunc='sum', margins=True)
+    'Amount_30_days'], aggfunc='sum', margins=True)
 ```
 
 ```python
 emergency_funds_7_days = df.pivot_table(index='Site', values=[
-    'Scholarship Application: CT Scholarship Distribution (current AY)_7_days',
-    'Scholarship Application: Total Amount Awarded_7_days'], aggfunc='sum', margins=True)
+    'Amount_7_days'], aggfunc='sum', margins=True)
 ```
 
 ```python
@@ -183,7 +213,7 @@ emergency_funds = emergency_funds[~(emergency_funds.index.isin(sites_to_remove))
 
 ```python
 
-google_sheet = Spread('1CsDG8bz9ZpkkruXN-RA2Zdrl5dPC21LlcFOAgb3qHlA')
+google_sheet = Spread('1N6RrEwQQA7FsjDxr482zbpkqqgV7Zj_paN8WtVVUZls')
 # google_sheet.open_sheet(0)
 
 
@@ -191,10 +221,6 @@ google_sheet = Spread('1CsDG8bz9ZpkkruXN-RA2Zdrl5dPC21LlcFOAgb3qHlA')
 
 ```python
 update_date = datetime.now().date().strftime("%m/%d/%Y")
-```
-
-```python
-
 ```
 
 ```python
