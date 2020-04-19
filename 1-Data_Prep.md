@@ -89,13 +89,18 @@ summary_file7 = Path.cwd() / "data" / "processed" / "processed_data_file7.pkl"
 ### Load Report From Salesforce
 
 ```python
-# Run if downloading report from salesforce
 # File 1 - getting from a Gconnector sheet due to an error with normal salesforce import
-
 
 file_1 = Spread('1r3YGO2PMz7tVu3duCN1stQG_phFFKOjW0KZO9XKgoP8')
 file_1.open_sheet(0)
 sf_df = file_1.sheet_to_df()
+```
+
+```python
+# Run if downloading report from salesforce
+
+
+
 
 
 
@@ -184,9 +189,13 @@ len(sf_df), len(sf_df_file2),len(sf_df_file3),len(sf_df_file4)
 ```
 
 ```python
-# # Only run if ran above cell
 # # File 1
 sf_df.to_csv(in_file1, index=True)
+```
+
+```python
+# # Only run if ran above cell
+
 
 
 # # File 2 and 3 (As needed)
@@ -247,16 +256,18 @@ df_reciprocal_activity = df[df['Reciprocal Communication'] > 0]
 ```
 
 ```python
-def create_df_to_merge_day(df, col_id, col_name, day_limit):
+def create_df_to_merge_day(df, col_id, col_name, day_limit=None):
 
-    _df = df[df.Date>= (datetime.now() - timedelta(days=day_limit))]
+    if day_limit:
+        _df = df[df.Date >= (datetime.now() - timedelta(days=day_limit))]
+
     _series = _df.groupby(col_id).size()
-    _series.name = col_name + "_"  + str(day_limit) + "_day"
+    if day_limit:
+        _series.name = col_name + "_" + str(day_limit) + "_day"
+    else:
+        _series.name = col_name
     _series.index.names = ['18 Digit ID']
-    
-
     _series = _series.to_frame().reset_index()
-    
     return _series
 
 
@@ -266,8 +277,12 @@ def create_df_to_merge(df, col_id, col_name):
     _series.index.names = ['18 Digit ID']
 
     _series = _series.to_frame().reset_index()
-    
+
     return _series
+```
+
+```python
+create_df_to_merge_day(df_file6, "18 Digit ID", 'workshops_attended', 7).sum()
 ```
 
 ```python
