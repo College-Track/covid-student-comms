@@ -111,9 +111,8 @@ class SalesforceReport:
             _series = _df.groupby(self.student_id_column).sum()
 
         if day_limit:
-            print(self.report_name)
             _series.name = self.summary_column_name + \
-                "_" + str(day_limit) + "_day"
+                "_" + str(day_limit) + "_days"
         else:
             _series.name = self.summary_column_name
         _series.index.names = ['18 Digit ID']
@@ -128,7 +127,12 @@ class SalesforceReport:
             columns={self.student_id_column: "18 Digit ID"}, inplace=True)
 
         if self.report_name == "emergency_fund":
-            _series.rename(columns={'Amount': 'amount_' + str(day_limit)}, inplace=True)
+            if day_limit:
+                _series.rename(columns={'Amount': 'amount_' + str(day_limit) + "_days"}, inplace=True)
+            else:
+                _series.rename(columns={'Amount': 'amount'}, inplace=True)
+        
+        _series.set_index('18 Digit ID', inplace=True)
         
         if day_limit == 7:
             self.seven_day_summary = _series
@@ -166,7 +170,33 @@ files_prep = [
         "student_id_column": "NA"
 
     },
-    
+    {
+        "name": "outgoing_sms",
+        "id": "00O1M0000077bWTUAY",
+        "report_filter_column": "SMS History: Record number",
+        "date_column": "SMS History: Created Date",
+        "summary_column_name": "outgoing_sms_count",
+        "student_id_column": "Contact: 18 Digit ID"
+
+    }, 
+    {
+        "name": "workshops",
+        "id": "00O1M0000077bbYUAQ",
+        "report_filter_column": "Workshop Session Attendance: Workshop Session Attendance Name",
+        "date_column": "Date",
+        "summary_column_name": "workshop_count",
+        "student_id_column": "18 Digit ID"
+
+    },   
+    {
+        "name": "case_notes",
+        "id": "00O1M0000077c3cUAA",
+        "report_filter_column": "Case Note: Case Note ID",
+        "date_column": "Date",
+        "summary_column_name": "case_note_count",
+        "student_id_column": "Academic Term: 18 Digit Student ID"
+
+    },       
     
 ]
 ```
@@ -301,34 +331,67 @@ df_combined = pd.concat([df_english, df_spanish, df_english_second_sheet], axis=
 df_college = pd.concat([df_college_old, df_college_new], axis=0, ignore_index=True)
 
 
-```
-
-```python
 hs_reduced_columns = df_combined[[
     'Submitted Date', 'Student: High School Contact Id']]
 
 hs_reduced_columns.rename(
     columns={'Student: High School Contact Id': '18 Digit ID'}, inplace=True)
-```
 
-```python
+
+
 ps_reduced_columns = df_college[['Submitted Date', 'Student 18 Digit Id']]
 ps_reduced_columns.rename(columns={'Student 18 Digit Id': '18 Digit ID'}, inplace=True)
+
+
+
+
+
 ```
 
 ```python
-survey_df = pd.concat([ps_reduced_columns, hs_reduced_columns], axis=0, ignore_index=True, sort=True)
+survey_location = (Path.cwd() / "data" / "raw" / "survey.csv")
 
+survey_df_prep = pd.concat([ps_reduced_columns, hs_reduced_columns], axis=0, ignore_index=True, sort=True)
+
+
+survey_df_prep.to_csv(survey_location, index=False)
 ```
 
 ```python
-survey_df['Submitted Date'] = pd.to_datetime(survey_df['Submitted Date'])
+survey_df = pd.read_csv(survey_location)
+```
 
-survey_df.rename(columns={'Submitted Date': 'Date'}, inplace=True)
+```python
+files['survey'] = SalesforceReport(len(
+    files) + 1, "NA", "NA", "survey", "Submitted Date", "took_survey", "18 Digit ID")
+```
+
+```python
+files['survey'].salesforce_df = pd.concat([ps_reduced_columns, hs_reduced_columns], axis=0, ignore_index=True, sort=True)
+```
+
+```python
+files['survey'].write_csv()
+```
+
+```python
+files['survey'].read_csv()
+```
+
+```python
+files['survey'].convert_date_column()
+```
+
+```python
+generate_summary_frames(files)
 ```
 
 ```python
 master_df = files['roster'].df.copy()
+```
+
+```python
+master_df.set_index('18 Digit ID', inplace=True)
 ```
 
 ```python
@@ -338,13 +401,13 @@ def prep_master_df_with_counts(files, master_df):
         if file == 'roster':
             continue
         master_df = master_df.merge(
-            files[file].seven_day_summary, how='left', on='18 Digit ID'
+            files[file].seven_day_summary, how='left', left_index=True, right_index=True
         )
         master_df = master_df.merge(
-            files[file].thirty_day_summary, how='left', on='18 Digit ID'
+            files[file].thirty_day_summary, how='left', left_index=True, right_index=True
         )
         master_df = master_df.merge(
-            files[file].all_time_summary, how='left', on='18 Digit ID'
+            files[file].all_time_summary, how='left', left_index=True, right_index=True
         )
     return master_df
 ```
@@ -354,163 +417,191 @@ master_df = prep_master_df_with_counts(files, master_df)
 ```
 
 ```python
-survey_dfs = [survey_df]
-survey_dfs = [{"time_period": "",
-               "df": survey_df}]
+threshold_frames = {
+    'outreach': ['activity_count', 'outgoing_sms_count', 'workshop_count', 'case_note_count'],
+    "outreach_minus_text": ['activity_count', 'workshop_count', 'case_note_count'],
+    "reciprocal": ['incoming_sms_count', 'reciprocal_activity_count', 'took_survey', 'case_note_count', 'workshop_count'],
+    "workshop": ['workshop_count'] 
+}
 
 
-for i in [7, 30]:
-    _dict = {}
+def count_of_key_areas(master_df, threshold_frames):
+    time_periods = ["", "_7_days", "_30_days"]
 
-    _dict['time_period'] = "_" + str(i) + "_days"
-    _dict['df'] = (survey_df[survey_df['Date'] >= (
-        datetime.now() - timedelta(days=i))])
+    for key, items in threshold_frames.items():
 
-    survey_dfs.append(_dict)
+        for time_period_name in time_periods:
+            master_df['total_' + key + time_period_name] = 0
+            for item in items:
+                master_df_column = 'total_' + key + time_period_name
+                sub_column = item + time_period_name
+#                 print("column adding:", sub_column)
+#                 print("sum of master column:", master_df[master_df_column].sum())
+#                 print("sum of sub column:", master_df[sub_column].sum())
+#                 print("sum of two columns: ", (master_df[master_df_column].add(master_df[sub_column], fill_value=0)).sum())
+                
+
+                master_df[master_df_column] = master_df[master_df_column].add(master_df[sub_column], fill_value=0)
+                
+#                 print('master_df value after add:', master_df[master_df_column].sum())
+#                 print('break')
+
+    return master_df
 ```
 
 ```python
-for i in survey_dfs:
-    master_df['took_survey' + i['time_period']] = master_df['18 Digit ID'].isin(i['df']['18 Digit ID'])
+def determine_if_met_threshold(master_df, threshold_frames):
+    time_periods = ["", "_7_days", "_30_days"]
+
+    for key in threshold_frames.keys():
+        for time_period_name in time_periods:
+            column_name = "met_" + key + time_period_name
+            check_column = 'total_' + key + time_period_name
+
+            master_df[column_name] = master_df[check_column] > 0
+        
+    return master_df
 ```
 
 ```python
-# 7 Days
-# Total Contacts 7 Days
-df_file4['total_contacts_7_days'] = (df_file4.activity_count_7_day.add(
-    df_file4.outgoing_sms_count_7_day, fill_value=0).add(df_file4.workshops_attendend_7_days, fill_value=0).add(df_file4.case_note_count_7_day, fill_value=0))
-
-df_file4['been_contacted_7_days'] = df_file4['total_contacts_7_days'] > 0
-
-# Total Contacts Minus Text 7 Days
-df_file4['been_contacted_minis_text_7_days'] = (df_file4.activity_count_7_day).add(
-    df_file4.workshops_attendend_7_days, fill_value=0).add(df_file4.case_note_count_7_day, fill_value=0) > 0 
-
-
-# Total Reciprocal 7 Days
-df_file4['total_reciprocal_communication_7_days'] = (df_file4.incoming_sms_count_7_day.add(
-    df_file4.reciprocal_count_7_day, fill_value=0).add(df_file4.took_survey_7_days, fill_value=0).add(df_file4.workshops_attendend_7_days, fill_value=0).add(df_file4.case_note_count_7_day, fill_value=0))
-df_file4['reciprocal_communication_7_days'] = df_file4['total_reciprocal_communication_7_days'] > 0
-
-# Workshops 7 Days
-df_file4['attended_at_least_one_workshop_7_days'] = (
-    df_file4.workshops_attendend_7_days > 0)
+master_df = count_of_key_areas(master_df,threshold_frames)
 ```
 
 ```python
-# Total Contacts 30 Days
-df_file4['total_contacts_30_days'] = (df_file4.activity_count_30_day.add(
-    df_file4.outgoing_sms_count_30_day, fill_value=0).add(df_file4.workshops_attendend_30_days, fill_value=0).add(df_file4.case_note_count_30_day, fill_value=0))
-df_file4['been_contacted_30_days'] = df_file4['total_contacts_30_days'] > 0
-
-
-# Total Contacts Minus Text 30 Days
-df_file4['been_contacted_minis_text_30_days'] = (
-    df_file4.activity_count_30_day).add(
-    df_file4.workshops_attendend_30_days, fill_value=0).add(df_file4.case_note_count_30_day, fill_value=0) > 0 
-
-
-# Total Reciprocal 30 Days
-
-df_file4['total_reciprocal_communication_30_days'] = (df_file4.incoming_sms_count_30_day.add(
-    df_file4.reciprocal_count_30_day, fill_value=0).add(df_file4.took_survey_30_days, fill_value=0).add(df_file4.workshops_attendend_30_days, fill_value=0).add(df_file4.case_note_count_30_day, fill_value=0))
-
-df_file4['reciprocal_communication_30_days'] = df_file4['total_reciprocal_communication_30_days'] > 0
-
-
-# Workshops 30 days
-df_file4['attended_at_least_one_workshop_30_days'] = (
-    df_file4.workshops_attendend_30_days > 0)
+master_df = determine_if_met_threshold(master_df, threshold_frames)
 ```
 
 ```python
-# Total Contacts
-df_file4['total_contacts'] = (df_file4.activity_count.add(
-    df_file4.outgoing_sms_count, fill_value=0).add(df_file4.workshops_attendend, fill_value=0).add(df_file4.case_note_count, fill_value=0))
+ def create_table_for_report(df, percent_column, count_column, time_period, measure, include_ps=True, workshop=False):
+    if time_period == "":
+        time_period_text = "Since March 1st"
+    else:
+        time_period_text = str(time_period) + " Days"
 
-df_file4['been_contacted'] = df_file4['total_contacts'] > 0
+    hs_df = df[df['Contact Record Type'] == "Student: High School"]
+    count_table_hs = pd.pivot_table(
+        data=hs_df, index='Site', values=count_column, aggfunc='sum', margins=False)
+    percent_table_hs = pd.crosstab(
+        hs_df['Site'], hs_df[percent_column], normalize=False, margins=False)
 
-# Total Contacts Minus Text
-df_file4['been_contacted_minis_text'] = (df_file4.activity_count).add(
-    df_file4.workshops_attendend, fill_value=0).add(df_file4.case_note_count, fill_value=0) > 0
+    student_count_hs = pd.DataFrame(hs_df['Site'].value_counts()).rename(
+        columns={"Site": "Student Count"})
 
+    if workshop == True:
+        count_table_hs.rename(
+            columns={count_column: "Count of Workshop Sessions"}, inplace=False)
 
-# Total Reciprocal Communication
-df_file4['total_reciprocal_communication'] = (df_file4.incoming_sms_count.add(
-    df_file4.reciprocal_count, fill_value=0).add(df_file4.took_survey, fill_value=0).add(df_file4.workshops_attendend, fill_value=0).add(df_file4.case_note_count, fill_value=0))
+    count_table_hs.rename(
+        columns={count_column: "Count of " + measure}, inplace=True)
 
-df_file4['reciprocal_communication'] = df_file4['total_reciprocal_communication'] > 0
+    percent_table_hs = percent_table_hs.drop(columns=False)
+    percent_table_hs.rename(
+        columns={True: "Numerator of Site's Students " + measure}, inplace=True)
+    table_hs = pd.concat([count_table_hs, percent_table_hs], axis=1, sort=True)
+    table_hs["Numerator of Site's Students " + measure] = (
+        table_hs["Numerator of Site's Students " + measure])
+    table_hs['record_type'] = "High School"
+    table_hs['time_period'] = time_period_text
 
-# Worksops
-df_file4['attended_at_least_one_workshop'] = (df_file4.workshops_attendend > 0)
+    table_hs = pd.concat([table_hs, student_count_hs], axis=1, sort=True).reset_index()
+
+    if include_ps == True:
+        college_df = df[df['Contact Record Type'] == "Student: Post-Secondary"]
+        count_table_ps = pd.pivot_table(
+            data=college_df, index='Site', values=count_column, aggfunc='sum', margins=False)
+        percent_table_ps = pd.crosstab(
+            college_df['Site'], college_df[percent_column], normalize=False, margins=False)
+        count_table_ps.rename(
+            columns={count_column: "Count of " + measure}, inplace=True)
+        percent_table_ps = percent_table_ps.drop(columns=False)
+        percent_table_ps.rename(
+            columns={True: "Numerator of Site's Students " + measure}, inplace=True)
+        table_college = pd.concat([count_table_ps, percent_table_ps], axis=1, sort=True)
+#         table_college["Numerator of Site's Students " + measure] = (
+#             table_college["Numerator of Site's Students " + measure])
+        table_college['record_type'] = "Post-Secondary"
+        table_college['time_period'] = time_period_text
+
+        student_count_college = pd.DataFrame(college_df['Site'].value_counts()).rename(
+            columns={"Site": "Student Count"})
+        table_college = pd.concat(
+            [table_college, student_count_college], axis=1, sort=True).reset_index()
+
+        return table_hs.append(table_college)
+    else:
+
+        return table_hs
 ```
 
 ```python
-# File 1
-# df = helpers.shorten_site_names(df)
-# df = helpers.clean_column_names(df)
-
-# File 2
-# df_file2 = helpers.shorten_site_names(df_file2)
-# df_file2 = helpers.clean_column_names(df_file2)
-```
-
-### Save output file into processed directory
-
-Save a file in the processed directory that is cleaned properly. It will be read in and used later for further analysis.
-
-```python
-df_file4['student_count'] = 1
+been_contacted_table = create_table_for_report(
+    master_df, "met_outreach_30_days", 'total_outreach_30_days', 30, 'all_contacts')
 ```
 
 ```python
-# df_file4.loc[df['Contact Record Type'] == "Student: High School", 'Contact Record Type'] = "High School"
-# df_file4.loc[df['Contact Record Type'] == "Student: Post-Secondary", 'Contact Record Type'] = "Post-Secondary"
+def create_summary_tables(df):
+    time_periods = ['', 7, 30]
+    merge_columns = ['index', 'record_type', 'time_period', 'Student Count']
+    _complete_table = pd.DataFrame()
+    for time_period in time_periods:
+        if time_period != "":
+            column_text = "_" + str(time_period) + "_days"
+        else:
+            column_text = ""
+        _outreach_table = create_table_for_report(
+            master_df, "met_outreach" + column_text, 'total_outreach' +
+            column_text, time_period, 'all_contacts')
+
+        _outreach_minus_text = create_table_for_report(
+            master_df, "met_outreach_minus_text" + column_text, 'total_outreach_minus_text'+column_text, time_period, 'all_contacts_no_text')
+
+        _reciprocal_communication_table = create_table_for_report(
+            df, 'met_reciprocal' + column_text, "total_reciprocal" + column_text, time_period, 'reciprocal_communication')
+
+        _workshop_table = create_table_for_report(
+            df, 'met_workshop' + column_text, "workshop_count" + column_text, time_period, 'workshops', include_ps=False, workshop=True)
+        
+   
+        _table = _outreach_table.merge(_outreach_minus_text, on=merge_columns)
+
+        _table = _table.merge(_reciprocal_communication_table, on=merge_columns)
+
+        _table = _table.merge(_workshop_table, on=merge_columns, how='outer')
+        
+        _complete_table = _complete_table.append(_table)
+        
+        
+        
+            
+    return _complete_table
+        
+        
 ```
 
 ```python
-# df_file4 = helpers.shorten_site_names(df_file4)
-df_file5 = helpers.shorten_site_names(df_file5)
-
+summary_table = create_summary_tables(master_df)
 ```
 
 ```python
-# Save File 1 Data Frame (Or master df)
-df_file4.to_pickle(summary_file)
+summary_table.rename(columns={'index': 'Site'},inplace=True)
 ```
 
 ```python
-# df_file4 = df_file4.applymap(lambda x: 1 if x == True else x)
-# df_file4 = df_file4.applymap(lambda x: 0 if x == False else x)
-```
+summary_table = helpers.shorten_site_names(summary_table)
 
-```python
-# df_file4.to_csv('student_comms.csv',index=False)
 ```
 
 ```python
 google_sheet = Spread('1tEzcIDba-dF0M4uMHUt2fwOAtO91U8q6TUFPBp9TSbY')
 
 
-# google_sheet.df_to_sheet(df_file4, index=False, sheet='Sheet1', start='A1', replace=True)
- 
-```
+google_sheet.df_to_sheet(summary_table, index=False, sheet='Aggregate Data', start='A1', replace=True)
 
-```python
-google_sheet.df_to_sheet(df_file5, index=True, sheet='Emergency Fund', start='A1', replace=True)
 
-```
+google_sheet.df_to_sheet(files['emergency_fund'].df, index=True, sheet='Emergency Fund', start='A1', replace=True)
 
-```python
 update_date = datetime.now().date().strftime("%m/%d/%y")
 
-```
-
-```python
 google_sheet.update_cells(start='A1',end="A2", sheet="Updated", vals=[
                           'Updated:', update_date])
-```
-
-```python
-
 ```
