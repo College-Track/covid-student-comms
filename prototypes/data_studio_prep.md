@@ -5,7 +5,7 @@ jupyter:
       extension: .md
       format_name: markdown
       format_version: '1.2'
-      jupytext_version: 1.3.0
+      jupytext_version: 1.4.2
   kernelspec:
     display_name: Python 3
     language: python
@@ -30,6 +30,10 @@ Reports on student communication during COVID
 - 04-05-2020 : Started project
 
 ```python
+
+```
+
+```python
 %load_ext autoreload
 %autoreload 2
 # ALWAYS RUN
@@ -39,7 +43,6 @@ Reports on student communication during COVID
 ```
 
 ```python
-from salesforce_reporting import Connection, ReportParser
 import pandas as pd
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -288,10 +291,7 @@ site_count['Date'] = pd.to_datetime(site_count['Date'])
 ```
 
 ```python
-roster_enrollment_count = roster_subset.groupby(
-    ['Site', 'High School Class', 'Contact Record Type']).size().reset_index()
-roster_enrollment_count.rename(
-    columns={0: 'Number of Enrolled Students'}, inplace=True)
+a
 ```
 
 ```python

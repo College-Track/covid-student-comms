@@ -46,7 +46,7 @@ from gspread_pandas import Spread, Client
 
 ```python
 today = datetime.today()
-in_file = Path.cwd() / "data" / "processed" / "processed_data.pkl"
+in_file = Path.cwd() / "data" / "processed" / "summary_file.pkl"
 report_dir = Path.cwd() / "reports"
 report_file = report_dir / "Excel_Analysis_{today:%b-%d-%Y}.xlsx"
 ```
@@ -100,19 +100,23 @@ def create_table_for_report(df, percent_column, count_column, include_ps=True, w
 ```
 
 ```python
+df.columns
+```
+
+```python
 # All Time
 
 been_contacted_table_hs, been_contacted_table_college = create_table_for_report(
-    df, "been_contacted", 'total_contacts')
+    df, "met_outreach", 'total_outreach')
 
 been_contacted_no_text_table_hs, been_contacted_no_text_table_college = create_table_for_report(
-    df, 'been_contacted_minis_text', "activity_count")
+    df, 'met_outreach_minus_text', "total_outreach_minus_text")
 
 reciprocal_communication_table_hs, reciprocal_communication_table_college = create_table_for_report(
-    df, 'reciprocal_communication', "total_reciprocal_communication")
+    df, 'met_reciprocal', "total_reciprocal")
 
 attended_workshop_table_hs = create_table_for_report(
-    df, 'attended_at_least_one_workshop', "workshops_attendend", include_ps=False, workshop=True)
+    df, 'met_workshop', "total_workshop", include_ps=False, workshop=True)
 ```
 
 ```python
@@ -125,16 +129,16 @@ attended_workshop_table_hs = create_table_for_report(
 # 7 Days 
 
 been_contacted_table_7_days_hs, been_contacted_table_7_days_college = create_table_for_report(
-    df, "been_contacted_7_days", 'total_contacts_7_days')
+    df, "met_outreach_7_days", 'total_outreach_7_days')
 
 been_contacted_no_text_table_7_days_hs, been_contacted_no_text_table_7_days_college = create_table_for_report(
-    df, 'been_contacted_minis_text_7_days', "activity_count_7_day")
+    df, 'met_outreach_minus_text_7_days', "total_outreach_minus_text_7_days")
 
 reciprocal_communication_table_7_days_hs, reciprocal_communication_table_7_days_college = create_table_for_report(
-    df, 'reciprocal_communication_7_days', "total_reciprocal_communication_7_days")
+    df, 'met_reciprocal_7_days', "total_reciprocal_7_days")
 
 attended_workshop_table_7_days_hs = create_table_for_report(
-    df, 'attended_at_least_one_workshop_7_days', "workshops_attendend_7_days", include_ps=False, workshop=True)
+    df, 'met_workshop_7_days', "total_workshop_7_days", include_ps=False, workshop=True)
 ```
 
 ```python
@@ -150,16 +154,16 @@ attended_workshop_table_7_days_hs = create_table_for_report(
 # 30 Days
 
 been_contacted_table_30_days_hs, been_contacted_table_30_days_college = create_table_for_report(
-    df, "been_contacted_30_days", 'total_contacts_30_days')
+    df, "met_outreach_30_days", 'total_outreach_30_days')
 
 been_contacted_no_text_table_30_days_hs, been_contacted_no_text_table_30_days_college = create_table_for_report(
-    df, 'been_contacted_minis_text_30_days', "activity_count_30_day")
+    df, 'met_outreach_minus_text_30_days', "total_outreach_minus_text_30_days")
 
 reciprocal_communication_table_30_days_hs, reciprocal_communication_table_30_days_college = create_table_for_report(
-    df, 'reciprocal_communication_30_days', "total_reciprocal_communication_30_days")
+    df, 'met_reciprocal_30_days', "total_reciprocal_30_days")
 
 attended_workshop_table_30_days_hs = create_table_for_report(
-    df, 'attended_at_least_one_workshop_30_days', "workshops_attendend_30_days", include_ps=False,workshop=True)
+    df, 'met_workshop_30_days', "total_workshop_30_days", include_ps=False,workshop=True)
 ```
 
 ```python
@@ -188,17 +192,17 @@ seven_day_contacts = reciprocal_communication_table_hs.append(reciprocal_communi
 ```
 
 ```python
-emergency_funds = df.pivot_table(index='Site', values=['Amount'], aggfunc='sum', margins=True)
+emergency_funds = df.pivot_table(index='Site', values=['amount'], aggfunc='sum', margins=True)
 ```
 
 ```python
 emergency_funds_30_days = df.pivot_table(index='Site', values=[
-    'Amount_30_days'], aggfunc='sum', margins=True)
+    'amount_30_days'], aggfunc='sum', margins=True)
 ```
 
 ```python
 emergency_funds_7_days = df.pivot_table(index='Site', values=[
-    'Amount_7_days'], aggfunc='sum', margins=True)
+    'amount_7_days'], aggfunc='sum', margins=True)
 ```
 
 ```python
@@ -212,9 +216,11 @@ emergency_funds = emergency_funds[~(emergency_funds.index.isin(sites_to_remove))
 ```
 
 ```python
+test_sheet = '1N6RrEwQQA7FsjDxr482zbpkqqgV7Zj_paN8WtVVUZls'
 
-google_sheet = Spread('1N6RrEwQQA7FsjDxr482zbpkqqgV7Zj_paN8WtVVUZls')
-# google_sheet.open_sheet(0)
+google_sheet = Spread("1CsDG8bz9ZpkkruXN-RA2Zdrl5dPC21LlcFOAgb3qHlA")
+
+google_sheet.open_sheet(0)
 
 
 ```
