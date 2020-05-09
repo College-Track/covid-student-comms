@@ -92,3 +92,5 @@ target/
 
 *.ipynb
 !Report.ipynb
+
+venv/*
