@@ -1,4 +1,3 @@
-from salesforce_reporting import Connection, ReportParser
 import pandas as pd
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -7,7 +6,22 @@ import os
 import numpy as np
 from reportforce import Reportforce
 from gspread_pandas import Spread, Client
+import load_data
+from classes import SalesforceReport
+from variables import (
+    files_prep,
+    activities,
+    reciprocal_activities,
+    ACTIVITIES_GOOGLE_SHEET,
+    threshold_frames,
+    regions,
+    GOOGLE_SHEET_UPLOAD,
+)
+
+import prep_data
 from dotenv import load_dotenv
+
+load_dotenv()
 
 
 SF_PASS = os.environ.get("SF_PASS")
@@ -17,94 +31,103 @@ SF_USERNAME = os.environ.get("SF_USERNAME")
 sf = Reportforce(username=SF_USERNAME, password=SF_PASS, security_token=SF_TOKEN)
 
 
-class SalesforceReport:
-    def __init__(self, file_number, report_id, report_filter_column, report_name):
-        self.report_name = report_name
-        self.file_numer = file_number
-        self.report_id = report_id
-        self.report_filter_column = report_filter_column
-        self.salesforce_df = None
-        self.df = None
+def main():
+    files = load_data.setup_classes(files_prep)
+    # COMMENT FOR TESTING
+    load_data.load_from_salesforce(files_prep, files, sf)
+    files = load_data.setup_activities_files(files, activities, reciprocal_activities)
+    files = load_data.load_activities_files(files, ACTIVITIES_GOOGLE_SHEET)
 
-        self.in_file = "sf_output_file" + str(file_number) + ".csv"
-        self.summary_file = "process_data_file" + str(file_number) + ".pkl"
+    # COMMENT FOR PRODUCTION
+    # load_data.read_from_csv(files)
 
-        self.in_file_location = Path.cwd() / "data" / "raw" / self.in_file
-        self.summary_file_location = Path.cwd() / "data" / "raw" / self.summary_file
+    # COMMENT FOR TESTING
+    load_data.by_pass_csv(files)
 
-    def read_from_salesforce(self, sf):
-        self.salesforce_df = sf.get_report(
-            self.report_id, id_column=self.report_filter_column
-        )
+    load_data.convert_all_files_date_column(files)
 
-    def write_csv(self, index=False):
-        self.salesforce_df.to_csv(self.in_file_location, index=index)
+    # Generating Over time files
 
-    def read_csv(self):
-        self.df = pd.read_csv(self.in_file_location)
+    list_of_counts = prep_data.create_list_of_counts(files)
+    total_reciprocal_counts = prep_data.create_total_counts(list_of_counts)
+    total_reciprocal_counts = prep_data.adjust_count_dates(total_reciprocal_counts)
+    roster_subset = files["roster"].df[
+        ["18 Digit ID", "Site", "High School Class", "Contact Record Type"]
+    ]
+    roster_with_count = prep_data.create_roster_with_counts(
+        roster_subset, total_reciprocal_counts
+    )
+    site_count = prep_data.create_site_count(roster_with_count)
+    site_count_with_enrollments = prep_data.create_site_count_with_enrollments(
+        roster_subset, site_count
+    )
+    site_count_with_enrollments = helpers.shorten_site_names(
+        site_count_with_enrollments
+    )
+    site_count_with_enrollments["Region"] = site_count_with_enrollments.apply(
+        lambda x: prep_data.append_region(x["Site"], regions), axis=1
+    )
+    # Generating Summary Files
 
-    def write_pkl(self):
-        self.df.to_pickle(sellf.summary_file_location)
+    prep_data.generate_summary_frames(files)
+    master_df = files["roster"].df.copy()
+
+    master_df.set_index("18 Digit ID", inplace=True)
+
+    master_df = prep_data.prep_master_df_with_counts(files, master_df)
+    master_df = prep_data.count_of_key_areas(master_df, threshold_frames)
+    master_df = prep_data.determine_if_met_threshold(master_df, threshold_frames)
+
+    summary_table = prep_data.create_summary_tables(master_df)
+    summary_table.rename(columns={"index": "Site"}, inplace=True)
+    summary_table = helpers.shorten_site_names(summary_table)
+    summary_table.loc[
+        summary_table["time_period"] == "7 Days", "time_period"
+    ] = "Last Week"
+
+    # Preping Emergency Fund
+    files["emergency_fund"].df = helpers.shorten_site_names(files["emergency_fund"].df)
+    files["emergency_fund"].df["Week"] = files["emergency_fund"].df[
+        "Date"
+    ] - pd.TimedeltaIndex(files["emergency_fund"].df.Date.dt.dayofweek, unit="d")
+    emergency_fund = files["emergency_fund"].df.pivot_table(
+        index="Week", columns="Site", values="Amount", aggfunc="sum"
+    )
+
+    # Upload Data
+
+    google_sheet = Spread(GOOGLE_SHEET_UPLOAD)
+
+    google_sheet.df_to_sheet(
+        summary_table,
+        index=False,
+        sheet="Aggregate Data DEMO",
+        start="A1",
+        replace=True,
+    )
+
+    google_sheet.df_to_sheet(
+        site_count_with_enrollments,
+        index=False,
+        sheet="Reciprocal Overtime DEMO",
+        start="A1",
+        replace=True,
+    )
+
+    google_sheet.df_to_sheet(
+        emergency_fund,
+        index=False,
+        sheet="Emergency Fund DEMO",
+        start="A1",
+        replace=True,
+    )
+
+    update_date = datetime.now().date().strftime("%m/%d/%y")
+
+    google_sheet.update_cells(
+        start="A1", end="A2", sheet="Updated DEMO", vals=["Updated:", update_date]
+    )
 
 
-files_prep = [
-    {
-        "name": "incoming_sms",
-        "id": "00O1M0000077bWiUAI",
-        "id_column": "Incoming SMS: ID",
-    },
-    #     {
-    #         "name": "outgoing_sms",
-    #         "id": "00O1M0000077bWTUAY",
-    #         "id_column": "SMS History: Record number"
-    #     },
-]
-
-
-def setup_classes(file_prep):
-    _files = {}
-    for i in range(len(files_prep)):
-        file_number = i + 1
-
-        file_title = files_prep[i]["name"]
-
-        _files[file_title] = SalesforceReport(
-            file_number,
-            files_prep[i]["id"],
-            files_prep[i]["id_column"],
-            files_prep[i]["name"],
-        )
-    return _files
-
-
-def load_from_salesforce(files_prep, files):
-    for i in range(len(files_prep)):
-        file_title = files_prep[i]["name"]
-        files[file_title].read_from_salesforce(sf)
-        files[file_title].write_csv()
-
-
-def read_from_csv(files_prep, files):
-    for i in range(len(files_prep)):
-        file_title = files_prep[i]["name"]
-        files[file_title].read_csv()
-
-
-files = setup_classes(files_prep)
-
-load_from_salesforce(files_prep, files)
-
-read_from_csv(files_prep, files)
-
-
-# One report needs to be loaded from Google Sheets
-
-activities_sheet = Spread("1r3YGO2PMz7tVu3duCN1stQG_phFFKOjW0KZO9XKgoP8")
-activities_sheet.open_sheet(0)
-activities_df = activities_sheet.sheet_to_df()
-
-
-# Survey Reports are also in Google Sheets
-
-
-print(files["incoming_sms"].df)
+if __name__ == "__main__":
+    main()
