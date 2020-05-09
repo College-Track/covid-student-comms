@@ -1,4 +1,3 @@
-from salesforce_reporting import Connection, ReportParser
 import pandas as pd
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -30,8 +29,8 @@ class SalesforceReport:
         self.summary_column_name = summary_column_name
         self.student_id_column = student_id_column
 
-        self.in_file = "sf_output_file_new" + str(file_number) + ".csv"
-        self.summary_file = "process_data_file_new" + str(file_number) + ".pkl"
+        self.in_file = "sf_output_file_" + self.report_name + ".csv"
+        self.summary_file = "process_data_file_" + self.report_name + ".pkl"
 
         self.in_file_location = Path.cwd() / "data" / "raw" / self.in_file
         self.summary_file_location = Path.cwd() / "data" / "raw" / self.summary_file
@@ -39,6 +38,9 @@ class SalesforceReport:
         self.seven_day_summary = None
         self.thirty_day_summary = None
         self.all_time_summary = None
+
+    def bypass_csv(self):
+        self.df = self.salesforce_df
 
     def read_from_salesforce(self, sf):
         self.salesforce_df = sf.get_report(
@@ -55,14 +57,15 @@ class SalesforceReport:
         self.df.to_pickle(self.summary_file_location)
 
     def convert_date_column(self):
-        self.df[self.date_column] = pd.to_datetime(self.df[self.date_column])
+        self.df.loc[:, self.date_column] = pd.to_datetime(self.df[self.date_column])
         if self.date_column != "Date":
             self.df.rename(columns={self.date_column: "Date"}, inplace=True)
 
     def create_summary(self, day_limit=None, sum_type="count"):
         if day_limit == 30:
             _df = self.df[
-                self.df.Date >= (datetime.now().date() - timedelta(days=day_limit))
+                self.df.Date.dt.date
+                >= (datetime.now().date() - timedelta(days=day_limit))
             ]
         elif day_limit == 7:
             last_week_num = int(datetime.now().strftime("%U")) - 1
@@ -111,56 +114,3 @@ class SalesforceReport:
             self.thirty_day_summary = _series
         else:
             self.all_time_summary = _series
-
-
-def setup_classes(files_prep):
-    _files = {}
-    for i in range(len(files_prep)):
-        file_number = i + 1
-
-        file_title = files_prep[i]["name"]
-
-        _files[file_title] = SalesforceReport(
-            file_number,
-            files_prep[i]["id"],
-            files_prep[i]["report_filter_column"],
-            files_prep[i]["name"],
-            files_prep[i]["date_column"],
-            files_prep[i]["summary_column_name"],
-            files_prep[i]["student_id_column"],
-        )
-    return _files
-
-
-def load_from_salesforce(files_prep, files, sf):
-    for i in range(len(files_prep)):
-        file_title = files_prep[i]["name"]
-        files[file_title].read_from_salesforce(sf)
-        files[file_title].write_csv()
-
-
-def read_from_csv(files):
-    for file_title in files:
-        files[file_title].read_csv()
-
-        if files[file_title].date_column:
-            files[file_title].convert_date_column()
-
-
-def write_to_pkl(files):
-    for file_title in files:
-        files[file_title].write_pkl()
-
-
-def generate_summary_frames(files):
-    days_to_check = [7, 30, None]
-
-    for file in files:
-        if file == "roster":
-            continue
-
-        for day_limit in days_to_check:
-            if file == "emergency_fund":
-                files[file].create_summary(day_limit, sum_type="sum")
-            else:
-                files[file].create_summary(day_limit)
