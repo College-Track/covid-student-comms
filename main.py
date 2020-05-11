@@ -5,7 +5,7 @@ import helpers
 import os
 import numpy as np
 from reportforce import Reportforce
-from gspread_pandas import Spread, Client
+from gspread_pandas import Spread, Client, conf
 import load_data
 from classes import SalesforceReport
 from variables import (
@@ -24,24 +24,30 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+GSPREAD_PANDAS_CONFIG_DIR = os.environ.get("GSPREAD_PANDAS_CONFIG_DIR")
 SF_PASS = os.environ.get("SF_PASS")
 SF_TOKEN = os.environ.get("SF_TOKEN")
 SF_USERNAME = os.environ.get("SF_USERNAME")
 
+config = conf.get_config(GSPREAD_PANDAS_CONFIG_DIR)
+
+
 sf = Reportforce(username=SF_USERNAME, password=SF_PASS, security_token=SF_TOKEN)
+# conf.get_config
 
 
 def main():
-    files = load_data.setup_classes(files_prep)
-    # COMMENT FOR TESTING
-    load_data.load_from_salesforce(files_prep, files, sf)
-    files = load_data.setup_activities_files(files, activities, reciprocal_activities)
-    files = load_data.load_activities_files(files, ACTIVITIES_GOOGLE_SHEET)
 
-    # COMMENT FOR PRODUCTION
+    # FOR TESTING
+    # files = load_data.setup_classes(files_prep)
+    # files = load_data.setup_activities_files(files, activities, reciprocal_activities)
     # load_data.read_from_csv(files)
 
-    # COMMENT FOR TESTING
+    # FOR PRODUCTION
+    files = load_data.setup_classes(files_prep)
+    load_data.load_from_salesforce(files_prep, files, sf)
+    files = load_data.setup_activities_files(files, activities, reciprocal_activities)
+    files = load_data.load_activities_files(files, ACTIVITIES_GOOGLE_SHEET, config)
     load_data.by_pass_csv(files)
 
     load_data.convert_all_files_date_column(files)
@@ -96,36 +102,28 @@ def main():
 
     # Upload Data
 
-    google_sheet = Spread(GOOGLE_SHEET_UPLOAD)
+    google_sheet = Spread(GOOGLE_SHEET_UPLOAD, config=config)
 
     google_sheet.df_to_sheet(
-        summary_table,
-        index=False,
-        sheet="Aggregate Data DEMO",
-        start="A1",
-        replace=True,
+        summary_table, index=False, sheet="Aggregate Data", start="A1", replace=True,
     )
 
     google_sheet.df_to_sheet(
         site_count_with_enrollments,
         index=False,
-        sheet="Reciprocal Overtime DEMO",
+        sheet="Reciprocal Overtime",
         start="A1",
         replace=True,
     )
 
     google_sheet.df_to_sheet(
-        emergency_fund,
-        index=False,
-        sheet="Emergency Fund DEMO",
-        start="A1",
-        replace=True,
+        emergency_fund, index=True, sheet="Emergency Fund", start="A1", replace=True,
     )
 
     update_date = datetime.now().date().strftime("%m/%d/%y")
 
     google_sheet.update_cells(
-        start="A1", end="A2", sheet="Updated DEMO", vals=["Updated:", update_date]
+        start="A1", end="A2", sheet="Updated", vals=["Updated:", update_date]
     )
 
 

@@ -43,11 +43,22 @@ def create_total_counts(list_of_counts):
     return _count
 
 
+def create_timedelta(date):
+    # If Sunday, advance to monday
+    if date.strftime("w%") == 0:
+        return timedelta(days=-1)
+    # If Monday - Saturday go back to Monday
+    else:
+        day_adjust = int(date.strftime("%w"))
+        return timedelta(days=day_adjust - 1)
+
+
 def adjust_count_dates(_count):
+
     _count["Date"] = pd.to_datetime(_count["Date"])
-    _count["Date"] = _count["Date"] - pd.TimedeltaIndex(
-        _count.Date.dt.strftime("%w").astype(int), unit="d"
-    )
+    _count["adjust"] = _count.apply(lambda x: create_timedelta(x["Date"]), axis=1)
+    _count["Date"] = _count["Date"] - pd.TimedeltaIndex(_count.adjust, unit="d")
+    _count.drop(columns="adjust", inplace=True)
     return _count
 
 
@@ -95,7 +106,7 @@ def create_site_count_with_enrollments(_roster, site_count):
         site_count_with_enrollments["Date"] >= datetime(2020, 3, 1)
     ]
     site_count_with_enrollments = site_count_with_enrollments[
-        site_count_with_enrollments["Date"] < datetime.now()
+        site_count_with_enrollments["Date"] <= datetime.now()
     ]
 
     return site_count_with_enrollments
