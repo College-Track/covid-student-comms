@@ -55,8 +55,8 @@ def write_to_pkl(files):
         files[file_title].write_pkl()
 
 
-def load_from_google_sheets(sheet_id, sheet_number):
-    _sheet = Spread(sheet_id)
+def load_from_google_sheets(sheet_id, sheet_number, config):
+    _sheet = Spread(sheet_id, config=config)
     _sheet.open_sheet(sheet_number)
 
     _df = _sheet.sheet_to_df().reset_index()
@@ -73,8 +73,8 @@ def setup_activities_files(files, activities, reciprocal_activities):
     return files
 
 
-def load_activities_files(files, sheet_id):
-    activities_df = load_data.load_from_google_sheets(sheet_id, 0)
+def load_activities_files(files, sheet_id, config):
+    activities_df = load_data.load_from_google_sheets(sheet_id, 0, config)
     activities_df = activities_df.astype({"Reciprocal Communication": "int32"})
     reciprocol_df = activities_df[activities_df["Reciprocal Communication"] > 0]
     files["activities"].salesforce_df = activities_df
