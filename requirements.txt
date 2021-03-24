@@ -72,7 +72,7 @@ regex==2020.5.7
 reportforce==0.0.3
 requests==2.23.0
 requests-oauthlib==1.3.0
-rsa==4.0
+rsa==4.1
 Send2Trash==1.5.0
 simple-salesforce==1.0.0
 six==1.14.0
